@@ -49,9 +49,9 @@ Describe 'Get-CurrentRDVersionSetup'{
     }
     It 'Returns <expected>' -ForEach @(
         @{RD3Keys = @("RD3Keys", "RD3Keys") ; RD2KKeyFound = $True ; Expected = 3}
-        @{RD3Keys = @() ; RD2KeyFound = $False ; Expected = 4}
+        @{RD3Keys = @() ; RD2KeyFound = $False ; Expected = 10}
         @{RD3Keys = @() ; RD2KeyFound = $True ; Expected = 2}
-        @{RD3Keys = @("RD3Keys") ; RD2KeyFound = $True ; Expected = 4}
+        @{RD3Keys = @("RD3Keys") ; RD2KeyFound = $True ; Expected = 10}
     ) {
 
         Mock -Command Get-HKLMKeysOfInterest -MockWith {$rd3Keys}
