@@ -5,8 +5,11 @@ $HKCRClsidPath = "Registry::HKEY_CLASSES_ROOT\CLSID\"
 $extensionClsid = "69E0F697-43F0-3B33-B105-9B8188A6F040"
 $dockableToolWindowClsid = "69E0F699-43F0-3B33-B105-9B8188A6F040"
 
-$script:rd3Version = "3.0.0.0"
-$script:rd2Version = "2.5.2.0"
+$script:rd3Version = "TBD"
+$script:rd2Version = "TBD"
+$script:rdActiveVersion = "TBD"
+
+$script:rdHKCRKeys = @()
 
 #There are currently(4/23) 2 registry keys to be added for RD3: 
 #Rubberduck.Extension and Rubberduck.DockableToolWindow
@@ -17,6 +20,7 @@ $rdExtension = @{
     ShortHKLMPath = "HKLM:\SOFTWARE\Classes\CLSID\{<Extension>}"
     HKCRPath = "${HKCRClsidPath}{${extensionClsid}}"
     ShortHKCRPath = "HKCR:\CLSID\{<Extension>}"
+    InProcServer32Path = "Registry::HKEY_CLASSES_ROOT\CLSID\{${extensionClsid}}\InProcServer32"
     RD2ValuesPrototypeKey = "Registry::HKEY_CLASSES_ROOT\CLSID\{${extensionClsid}}\InProcServer32\${rd2Version}"
 }
 
@@ -25,6 +29,7 @@ $rdDockableToolWindow = @{
     ShortHKLMPath = "HKLM:\SOFTWARE\Classes\CLSID\{<DockableToolWindow>}"
     HKCRPath = "${HKCRClsidPath}{${dockableToolWindowClsid}}"
     ShortHKCRPath = "HKCR:\CLSID\{<DockableToolWindow>}"
+    InProcServer32Path = "Registry::HKEY_CLASSES_ROOT\CLSID\{${dockableToolWindowClsid}}\InProcServer32"
     RD2ValuesPrototypeKey = "Registry::HKEY_CLASSES_ROOT\CLSID\{${dockableToolWindowClsid}}\InProcServer32\${rd2Version}"
 }
 
@@ -34,13 +39,11 @@ $rd3HKLMDataPersistancePath = (Get-ChildItem env:USERPROFILE).Value + `
     "\AppData\Roaming\Rubberduck\RD3HKLMValues.json"
 
 
-function Test-CanProcessToTargetVersion($targetIsRD2){
+function Test-CanProcessToTargetVersion($rd3HKLMKeys, $targetIsRD2){
 
     Write-Verbose "Evaluating Registry content..."
 
     $result = @{CanProcess = $False}
-
-    $rd3HKLMKeys = Get-HKLMKeysOfInterest (Get-HKLMClsidKeys)
 
     if ((Test-IsConfiguredForRD2 $rd3HKLMKeys) -and $targetIsRD2){
         $result.Message = "Registry is configured for Rubberduck Version 2 - Nothing to do"
@@ -148,10 +151,8 @@ function Add-RD3RegistryKeys($regKeyModels){
     }
 }   
 
-function Get-CurrentRDVersionSetup(){
+function Get-CurrentRDVersionSetup($rd3HKLMKeys){
     
-    $rd3HKLMKeys = Get-HKLMKeysOfInterest (Get-HKLMClsidKeys)
- 
     $hasRD2Key = Test-Path $rdExtension.RD2ValuesPrototypeKey
 
     switch ($rd3HKLMKeys.Count)
@@ -160,6 +161,33 @@ function Get-CurrentRDVersionSetup(){
         2 {3} #RD3
         Default {10} #Unknown
     }
+}
+
+function Get-ActiveRDVersion($rdHKCRKeys){
+    
+    $result = "TBD"
+    
+    if ($rdHKCRKeys.Count -eq 2){ 
+        if ($rdHKCRKeys[0] -like "2.*"){
+            $script:rd2Version = $rdHKCRKeys[0]
+            $script:rd3Version = $rdHKCRKeys[1]
+        } else {
+            $script:rd3Version = $rdHKCRKeys[0]
+            $script:rd2Version = $rdHKCRKeys[1]
+        }
+        $result = $script:rd3Version
+    }
+    #Only Rd2 OR Rd3 is registered on the machine
+    elseif (-not $rdHKCRKeys.Count -eq 0){
+        if ($rdHKCRKeys -like "2.*"){
+            $script:rd2Version = $rdHKCRKeys
+            $result = $script:rd2Version
+        } elseif ($rdHKCRKeys -like "3.*"){
+            $script:rd3Version = $rdHKCRKeys
+            $result = $script:rd3Version
+        }
+    }
+    $result
 }
 
 function Get-CachedRD3KeyValuesFilepath($filepath = $null){
@@ -248,8 +276,8 @@ function Set-RD3InProcServer32Values(){
 
 function Get-RD2PrototypeKeys(){
     @(
-        $rdExtension.RD2ValuesPrototypeKey
-        $rdDockableToolWindow.RD2ValuesPrototypeKey
+        $rdExtension.InProcServer32Path + "\${script:rd2Version}"
+        $rdDockableToolWindow.InProcServer32Path + "\${script:rd2Version}"
     )
 }
 
@@ -420,11 +448,17 @@ function Test-AllPropertiesNotNull($model){
 }
 
 function Test-IsConfiguredForRD2($rd3HKLMKeys){
-    (Get-CurrentRDVersionSetup $rd3HKLMKeys) -eq 2
+    if ($script:rdActiveVersion -eq "TBD"){
+        $script:rdActiveVersion = Get-ActiveRDVersion $script:rdHKCRKeys
+    }
+    $script:rdActiveVersion.StartsWith("2")
 }
 
 function Test-IsConfiguredForRD3($rd3HKLMKeys){
-    (Get-CurrentRDVersionSetup $rd3HKLMKeys) -eq 3
+    if ($script:rdActiveVersion -eq "TBD"){
+        $script:rdActiveVersion = Get-ActiveRDVersion $script:rdHKCRKeys
+    }
+    $script:rdActiveVersion.StartsWith("3")
 }
 
 function Test-FileIsLocked($file){
@@ -438,14 +472,14 @@ function Test-FileIsLocked($file){
     }    
 }
 
-function Get-HKLMClsidKeys(){
-    $hklmKeys = @()
+function Get-SubKeys($hiveName, $subKeyPath){
+    $hiveKeys = @()
     try 
     {
         $reg = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey(`
-            [Microsoft.Win32.RegistryHive]"LocalMachine", $env:COMPUTERNAME)
+            [Microsoft.Win32.RegistryHive]($hiveName), $env:COMPUTERNAME)
 
-        $subKey = $reg.OpenSubKey("SOFTWARE\Classes\CLSID")
+        $subKey = $reg.OpenSubKey($subKeyPath)
 
         $subKeyNames = $subKey | 
             Select-Object Name, @{
@@ -453,16 +487,16 @@ function Get-HKLMClsidKeys(){
                 expression={$_.GetSubKeyNames()}
             }
             
-        $hklmKeys = $subKeyNames.SubKeys
+        $hiveKeys = $subKeyNames.SubKeys
     }
     catch {
-        $hklmKeys = @()
+        $hiveKeys = @()
     }
     finally {
         $subKey.Dispose()
     }
 
-    $hklmKeys
+    $hiveKeys
 }
 
 function Remove-RegistryKeys(){
@@ -517,4 +551,3 @@ function Set-RegistryKeyProperties(){
 function Get-RegistryPropertyValue($registryKey, $propertyName){
     (Get-ItemPropertyValue -Path $registryKey -Name $propertyName)
 }
-

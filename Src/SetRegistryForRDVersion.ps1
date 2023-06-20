@@ -9,17 +9,23 @@ param (
 
 . $PSScriptRoot\SetRegistryForRDVersionImpl.ps1
 
+$script:rdHKCRKeys = Get-SubKeys "ClassesRoot" "CLSID\{${extensionClsid}}\InProcServer32"
+
+$script:rdActiveVersion = Get-ActiveRDVersion $script:rdHKCRKeys
+
 if ($targetMajorVersion -eq "CurrentVersion"){
-    switch(Get-CurrentRDVersionSetup)
-    {
-        2 {"Current Registry configuration: Rubberduck Version 2"}
-        3 {"Current Registry configuration: Rubberduck Version 3"}
-        Default {"Unknown: Rubberduck2 and/or Rubberduck3 may not be installed"}
+    
+    if ($script:rdActiveVersion -eq "TBD"){
+        "Unknown: Rubberduck2 and/or Rubberduck3 may not be installed"
+    } else {
+        "Current Registry configuration: Rubberduck Version ${script:rdActiveVersion}"
     }
     exit
 }
 
-$validationResults = Test-CanProcessToTargetVersion ($targetMajorVersion -like "*2")
+$rd3HKLMKeys = Get-HKLMKeysOfInterest( Get-SubKeys "LocalMachine" "SOFTWARE\Classes\CLSID")
+
+$validationResults = Test-CanProcessToTargetVersion $rd3HKLMKeys ($targetMajorVersion -like "*2")
 
 if (-not $validationResults.CanProcess){
     $validationResults.Message

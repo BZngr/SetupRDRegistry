@@ -54,11 +54,9 @@ Describe 'Get-CurrentRDVersionSetup'{
         @{RD3Keys = @("RD3Keys") ; RD2KeyFound = $True ; Expected = 10}
     ) {
 
-        Mock -Command Get-HKLMKeysOfInterest -MockWith {$rd3Keys}
-
         Mock -Command Test-Path -MockWith {$rd2KeyFound}
 
-        $result = Get-CurrentRDVersionSetup
+        $result = Get-CurrentRDVersionSetup $rd3Keys
 
         $result | Should -Be $expected
     }
