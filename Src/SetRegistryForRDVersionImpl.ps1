@@ -21,7 +21,6 @@ $rdExtension = @{
     HKCRPath = "${HKCRClsidPath}{${extensionClsid}}"
     ShortHKCRPath = "HKCR:\CLSID\{<Extension>}"
     InProcServer32Path = "Registry::HKEY_CLASSES_ROOT\CLSID\{${extensionClsid}}\InProcServer32"
-    RD2ValuesPrototypeKey = "Registry::HKEY_CLASSES_ROOT\CLSID\{${extensionClsid}}\InProcServer32\${rd2Version}"
 }
 
 $rdDockableToolWindow = @{
@@ -30,7 +29,6 @@ $rdDockableToolWindow = @{
     HKCRPath = "${HKCRClsidPath}{${dockableToolWindowClsid}}"
     ShortHKCRPath = "HKCR:\CLSID\{<DockableToolWindow>}"
     InProcServer32Path = "Registry::HKEY_CLASSES_ROOT\CLSID\{${dockableToolWindowClsid}}\InProcServer32"
-    RD2ValuesPrototypeKey = "Registry::HKEY_CLASSES_ROOT\CLSID\{${dockableToolWindowClsid}}\InProcServer32\${rd2Version}"
 }
 
 $rdRegistryKeyPropertyNames = @("Assembly", "Class", "CodeBase", "RuntimeVersion")
@@ -39,20 +37,20 @@ $rd3HKLMDataPersistancePath = (Get-ChildItem env:USERPROFILE).Value + `
     "\AppData\Roaming\Rubberduck\RD3HKLMValues.json"
 
 
-function Test-CanProcessToTargetVersion($rd3HKLMKeys, $targetIsRD2){
+function Test-CanProcessToTargetVersion($targetIsRD2){
 
     Write-Verbose "Evaluating Registry content..."
 
     $result = @{CanProcess = $False}
 
-    if ((Test-IsConfiguredForRD2 $rd3HKLMKeys) -and $targetIsRD2){
-        $result.Message = "Registry is configured for Rubberduck Version 2 - Nothing to do"
+    if ((Test-IsConfiguredForRD2) -and $targetIsRD2){
+        $result.Message = "Registry is configured for Rubberduck Version ${script:rdActiveVersion} - Nothing to do"
         $result
         return
     }
     
-    if ((Test-IsConfiguredForRD3 $rd3HKLMKeys) -and (-not $targetIsRD2)){
-        $result.Message = "Registry is configured for Rubberduck Version 3 - Nothing to do"
+    if ((Test-IsConfiguredForRD3) -and (-not $targetIsRD2)){
+        $result.Message = "Registry is configured for Rubberduck Version ${script:rdActiveVersion} - Nothing to do"
         $result
         return
     }
@@ -66,7 +64,13 @@ function Test-CanProcessToTargetVersion($rd3HKLMKeys, $targetIsRD2){
             return
         }
 
-        $regKeyModelsFromFile = New-MaybeRegistryKeyModelsFromFile
+        $regKeyModelsFromFile = New-RegistryKeyModelsFromFile
+
+        if ($null -eq $regKeyModelsFromFile){
+            $result.Message = $valuesFromFileFailureMsg
+            $result
+            return
+        }
 
         if ($regKeyModelsFromFile.Count -ne $numberOfRD3Keys){
             $result.Message = $valuesFromFileFailureMsg
@@ -77,7 +81,7 @@ function Test-CanProcessToTargetVersion($rd3HKLMKeys, $targetIsRD2){
     } else {
         foreach ($prototypeKey in Get-RD2PrototypeKeys){
             if (-not (Test-Path $prototypeKey)){
-                $result.Message = "RD2 Registry Key(s) not found - script depends on an installed version of RD2"
+                $result.Message = "RD2 Registry Key(s) not found - script expects to discover existing registry entries for RD2"
                 $result
                 return
             }
@@ -87,7 +91,6 @@ function Test-CanProcessToTargetVersion($rd3HKLMKeys, $targetIsRD2){
     $result = @{
         "CanProcess" = $True
         "ModelsFromFile" = $regKeyModelsFromFile
-        "Rd3HKLMClsidKeys" = $rd3HKLMKeys
     }
     $result
 }
@@ -105,12 +108,12 @@ function Restore-RubberduckV2($rdHKLMClsidKeys){
 
     Set-RD2InProcServer32Values
 
-    "Registry keys set to support Rubberduck Version 2"
+    "Registry keys set to support Rubberduck Version ${script:rd2Version}"
 }
 
 function Restore-RubberduckV3($regKeyModels){
 
-    Write-Verbose "Restoring registry values to support Rubberduck Version 3"
+    Write-Verbose "Restoring registry values to support Rubberduck Version ${script:rd3Version}"
 
     Set-Rd3Version $regKeyModels
     
@@ -118,7 +121,7 @@ function Restore-RubberduckV3($regKeyModels){
 
     Set-RD3InProcServer32Values $regKeyModels
 
-    "Registry keys set to support Rubberduck Version 3"
+    "Registry keys set to support Rubberduck Version ${script:rd3Version}"
 }
 
 function Set-Rd3Version($regKeyModels){
@@ -151,18 +154,6 @@ function Add-RD3RegistryKeys($regKeyModels){
     }
 }   
 
-function Get-CurrentRDVersionSetup($rd3HKLMKeys){
-    
-    $hasRD2Key = Test-Path $rdExtension.RD2ValuesPrototypeKey
-
-    switch ($rd3HKLMKeys.Count)
-    {
-        0 { if ($hasRD2Key){2}else{10}} #RD2
-        2 {3} #RD3
-        Default {10} #Unknown
-    }
-}
-
 function Get-ActiveRDVersion($rdHKCRKeys){
     
     $result = "TBD"
@@ -177,7 +168,7 @@ function Get-ActiveRDVersion($rdHKCRKeys){
         }
         $result = $script:rd3Version
     }
-    #Only Rd2 OR Rd3 is registered on the machine
+    #Handles scenario where only Rd2 OR Rd3 is registered on the machine
     elseif (-not $rdHKCRKeys.Count -eq 0){
         if ($rdHKCRKeys -like "2.*"){
             $script:rd2Version = $rdHKCRKeys
@@ -346,7 +337,7 @@ function New-RegistryKeyModelFromRegistryKey($registryKey){
     New-RdRegistryKeyModel $registryKey $properties
 }
 
-function New-MaybeRegistryKeyModelsFromFile($filePath = $null){
+function New-RegistryKeyModelsFromFile($filePath = $null){
     
     $results = $null
     $modelsFilepath = Get-CachedRD3KeyValuesFilepath $filepath
@@ -367,7 +358,7 @@ function New-MaybeRegistryKeyModelsFromFile($filePath = $null){
 
     $results = @()
     foreach ($obj in $jsonObjs){
-        $model = (Convert-MaybeJsonToRegistryKeyModel $obj)
+        $model = (Convert-JsonToRegistryKeyModel $obj)
         if ($null -eq $model){
             $results = $null
             $results
@@ -379,7 +370,7 @@ function New-MaybeRegistryKeyModelsFromFile($filePath = $null){
     $results
 }
 
-function Convert-MaybeJsonToRegistryKeyModel($jsonObject){
+function Convert-JsonToRegistryKeyModel($jsonObject){
     #https://stackoverflow.com/questions/3740128/pscustomobject-to-hashtable
     $props = @{}
     $jsonObject.Properties.psobject.properties | ForEach-Object { $props[$_.Name] = $_.Value }  
@@ -397,6 +388,12 @@ function Get-InProcServer32PathFromKey($key){
     $target = "InProcServer32"
     $key.Substring(0, $key.IndexOf($target) + $target.Length)
 }
+
+function Get-Rd3VersionFromRd3RegistryKey($key){
+    $target = "InProcServer32\3."
+    $key.Substring($key.IndexOf($target) + ("InProcServer32\").Length)
+}
+
 
 function Test-IsValidRegistryKeyModel($model){
  
@@ -447,18 +444,18 @@ function Test-AllPropertiesNotNull($model){
         Where-Object {$null -eq $model.Properties[$_]}).Count -eq 0       
 }
 
-function Test-IsConfiguredForRD2($rd3HKLMKeys){
+function Test-IsConfiguredForRD2(){
     if ($script:rdActiveVersion -eq "TBD"){
         $script:rdActiveVersion = Get-ActiveRDVersion $script:rdHKCRKeys
     }
-    $script:rdActiveVersion.StartsWith("2")
+    $script:rdActiveVersion.StartsWith("2.")
 }
 
-function Test-IsConfiguredForRD3($rd3HKLMKeys){
+function Test-IsConfiguredForRD3(){
     if ($script:rdActiveVersion -eq "TBD"){
         $script:rdActiveVersion = Get-ActiveRDVersion $script:rdHKCRKeys
     }
-    $script:rdActiveVersion.StartsWith("3")
+    $script:rdActiveVersion.StartsWith("3.")
 }
 
 function Test-FileIsLocked($file){
