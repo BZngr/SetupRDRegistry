@@ -4,40 +4,51 @@
 param (
     [Parameter(Mandatory = $True)]
     [ValidateSet("CurrentVersion", "rd2", "rd3", "2", "3")] 
-    [string]$targetMajorVersion
+    [string]$requestedOp
 )
 
 . $PSScriptRoot\SetRegistryForRDVersionImpl.ps1
 
-if ($targetMajorVersion -eq "CurrentVersion"){
-    switch(Get-CurrentRDVersionSetup)
-    {
-        2 {"Current Registry configuration: Rubberduck Version 2"}
-        3 {"Current Registry configuration: Rubberduck Version 3"}
-        Default {"Unknown: Rubberduck2 and/or Rubberduck3 may not be installed"}
+$script:rdHKCRKeys = Get-SubKeys "ClassesRoot" "CLSID\{${extensionClsid}}\InProcServer32"
+
+$script:rdActiveVersion = Get-ActiveRDVersion $script:rdHKCRKeys
+
+if ($requestedOp -eq "CurrentVersion"){
+    
+    if ($script:rdActiveVersion -eq "TBD"){
+        "Unknown: Rubberduck2 and/or Rubberduck3 may not be installed"
+    } else {
+        "Current Registry configuration: Rubberduck Version ${script:rdActiveVersion}"
     }
     exit
 }
 
-$validationResults = Test-CanProcessToTargetVersion ($targetMajorVersion -like "*2")
+$targetIsRD2 = ($requestedOp -like "*2")
+
+$validationResults = Test-CanProcessToTargetVersion $targetIsRD2
 
 if (-not $validationResults.CanProcess){
     $validationResults.Message
     exit
 }
 
-if ($targetMajorVersion -like "*2"){
-    Restore-RubberduckV2 $validationResults.Rd3HKLMClsidKeys
+if ($targetIsRD2){
+    $rd3HKLMKeys = Get-HKLMKeysOfInterest( Get-SubKeys "LocalMachine" "SOFTWARE\Classes\CLSID")
+    Restore-RubberduckV2 $rd3HKLMKeys
 
 } else {
+    if ($script:rd3Version -eq "TBD"){
+        $keyPaths = $validationResults.ModelsFromFile.KeyPath
+        $script:rd3Version = Get-Rd3VersionFromRd3RegistryKey($keyPaths[0])
+    }
     Restore-RubberduckV3 $validationResults.ModelsFromFile
 }
 
 <#
 .SYNOPSIS
-Modifies the registry to enable either the Rubberduck 3 or the Rubberduck 2.5.2.0 VBIDE Add-In.
+Modifies the registry to enable either the Rubberduck 3 or the Rubberduck 2 VBIDE Add-In.
 .DESCRIPTION
-Modifies the registry to enable either the Rubberduck 3 or the Rubberduck 2.5.2.0 VBIDE Add-In.
+Modifies the registry to enable either the Rubberduck 3 or the Rubberduck 2 VBIDE Add-In.
 
 Why: 
 RD3 re-uses RD2 CLSIDs.  Consequently, the two Add-Ins cannot co-exist in memory.  
@@ -78,8 +89,8 @@ Setting up for Rubberduck Version 2:
 
     to match the values contained in 
 
-    HKEY_CLASSES_ROOT\CLSID\{69E0F697-43F0-3B33-B105-9B8188A6F040}\InProcServer32\2.5.2.0 and 
-    HKEY_CLASSES_ROOT\CLSID\{69E0F699-43F0-3B33-B105-9B8188A6F040}\InProcServer32\2.5.2.0 respectively
+    HKEY_CLASSES_ROOT\CLSID\{69E0F697-43F0-3B33-B105-9B8188A6F040}\InProcServer32\2.X.Y.Z and 
+    HKEY_CLASSES_ROOT\CLSID\{69E0F699-43F0-3B33-B105-9B8188A6F040}\InProcServer32\2.X.Y.Z respectively
 
 Setting up for Rubberduck Version 3:
 
@@ -99,8 +110,8 @@ as described in steps 1 and 2 above.
 
 Note: Closing and re-opening the Registry Editor application will show that adding the two HKLM keys 
 in #1 above, resulted in the creation of:
-    HKEY_CLASSES_ROOT\CLSID\{69E0F697-43F0-3B33-B105-9B8188A6F040}\InProcServer32\3.X.X.X and 
-    HKEY_CLASSES_ROOT\CLSID\{69E0F699-43F0-3B33-B105-9B8188A6F040}\InProcServer32\3.X.X.X
+    HKEY_CLASSES_ROOT\CLSID\{69E0F697-43F0-3B33-B105-9B8188A6F040}\InProcServer32\3.X.Y.Z and 
+    HKEY_CLASSES_ROOT\CLSID\{69E0F699-43F0-3B33-B105-9B8188A6F040}\InProcServer32\3.X.Y.Z
 
 .EXAMPLE
 ...\SetRegistryForRDVersion.ps1 CurrentVersion

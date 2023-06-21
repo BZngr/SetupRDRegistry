@@ -42,23 +42,23 @@ Describe 'Get-Rd3HKLMPaths Tests' {
     }
 }
 
-Describe 'Get-CurrentRDVersionSetup'{
+Describe 'Get-ActiveRDVersionTests'{
     BeforeAll{
-        . $PSScriptRoot\..\src\SetRegistryForRDVersionImpl.ps1 Get-CurrentRDVersionSetup
+        . $PSScriptRoot\..\src\SetRegistryForRDVersionImpl.ps1 Get-ActiveRDVersion
 
     }
     It 'Returns <expected>' -ForEach @(
-        @{RD3Keys = @("RD3Keys", "RD3Keys") ; RD2KKeyFound = $True ; Expected = 3}
-        @{RD3Keys = @() ; RD2KeyFound = $False ; Expected = 10}
-        @{RD3Keys = @() ; RD2KeyFound = $True ; Expected = 2}
-        @{RD3Keys = @("RD3Keys") ; RD2KeyFound = $True ; Expected = 10}
+        @{RD2Keys = @("2.5.2.0", "3.0.0.0") ; Expected = "3.0.0.0"}
+        @{RD2Keys = @() ; Expected = "TBD"}
+        @{RD2Keys = @("2.5.2.0") ; Expected = "2.5.2.0"}
+        @{RD2Keys = @("3.0.0.0") ; Expected = "3.0.0.0"} #only Rd3 exists on the machine
+        @{RD2Keys = @("2.5.9.0", "3.0.0.0") ; Expected = "3.0.0.0"}
+        @{RD2Keys = @("2.5.9.0", "3.1.0.0") ; Expected = "3.1.0.0"}
+        @{RD2Keys = @("2.5.9.0") ; Expected = "2.5.9.0"}
+        @{RD2Keys = @("3.1.0.0") ; Expected = "3.1.0.0"} #only Rd3 exists on the machine
     ) {
 
-        Mock -Command Get-HKLMKeysOfInterest -MockWith {$rd3Keys}
-
-        Mock -Command Test-Path -MockWith {$rd2KeyFound}
-
-        $result = Get-CurrentRDVersionSetup
+        $result = Get-ActiveRDVersion $rd2Keys
 
         $result | Should -Be $expected
     }

@@ -1,12 +1,6 @@
 Describe 'Test-CanProcessToTargetVersion tests'{
     BeforeAll {        
         . $PSScriptRoot\..\src\SetRegistryForRDVersionImpl.ps1
-
-        function Get-TestKeys($isRD2Target){
-            if ($IsRD2Target){
-                @("RegKey1", "RegKey2")
-            } else {@()}
-        }
     }
     Context 'Config File is Missing'{
         BeforeAll {
@@ -14,9 +8,7 @@ Describe 'Test-CanProcessToTargetVersion tests'{
         }
         It 'Fails if target is RD3 and RD3 config data file is missing'{
         
-            Mock -Command Get-HKLMKeysOfInterest -MockWith {Get-TestKeys($False)}
-    
-            $values = Test-CanProcessToTargetVersion $false @()
+            $values = Test-CanProcessToTargetVersion $false
     
             $values.CanProcess | Should -Be $False
         }
@@ -25,11 +17,15 @@ Describe 'Test-CanProcessToTargetVersion tests'{
             
             Mock -CommandName Test-Path -ParameterFilter {$Path -like "*2.*"} -MockWith {$True}
             
-            Mock -Command Test-IsConfiguredForRD3 -MockWith {$False}
+            Mock -Command Test-IsConfiguredForRD3 -MockWith {$True}
+            
+            Mock -Command Test-IsConfiguredForRD2 -MockWith {$False}
+
+            Mock -Command Get-RD2PrototypeKeys -MockWith {
+                @("TestPathExt\2.x.x.x", "TestPathDock\2.x.x.x")
+            }
     
-            Mock -Command Get-HKLMKeysOfInterest -MockWith {Get-TestKeys($True)}
-    
-            $values = Test-CanProcessToTargetVersion $True @()
+            $values = Test-CanProcessToTargetVersion $True
     
             $values.CanProcess | Should -Be $True
         }
@@ -70,13 +66,9 @@ Describe 'Test-CanProcessToTargetVersion tests'{
         Mock -CommandName Test-IsConfiguredForRD2 -MockWith {$True}
         Mock -CommandName Test-IsConfiguredForRD3 -MockWith {$False}
         
-        Mock -CommandName New-MaybeRegistryKeyModelsFromFile -MockWith {
+        Mock -CommandName New-RegistryKeyModelsFromFile -MockWith {
             $FileReadResult
         } 
-
-        Mock -CommandName Get-HKLMKeysOfInterest -MockWith{
-            (Get-TestKeys $IsRD2Target)
-        }
 
         $values = Test-CanProcessToTargetVersion $false
 
@@ -98,10 +90,6 @@ Describe 'Test-CanProcessToTargetVersion tests'{
             $isLocked
         } 
 
-        Mock -CommandName Get-HKLMKeysOfInterest -MockWith{
-            (Get-TestKeys $IsRD2Target)
-        }
-
         $values = Test-CanProcessToTargetVersion $IsRD2Target
 
         $values.CanProcess | Should -Be $expected
@@ -116,18 +104,14 @@ Describe 'Test-CanProcessToTargetVersion tests'{
     ){
         
         Mock -CommandName Test-Path -ParameterFilter {-not ($Path -like "*2.*") } -MockWith {
-            #Write-Verbose "Called Mock for non '*2.*' path -> Test-Path" -Verbose
             $True
         }  
 
         Mock -CommandName Test-Path -ParameterFilter {$Path -like "*2.*" } -MockWith {
-            #Write-Verbose "Called Mock for '*2.*' path -> Test-Path" -Verbose
             $Exists
-        }  
-
-        Mock -CommandName Get-HKLMKeysOfInterest -MockWith{
-            (Get-TestKeys $IsRD2Target)
-        }
+        } 
+        
+        Mock -Command Get-RD2PrototypeKeys -MockWith {@("TestPathExt\2.x.x.x", "TestPathDock\2.x.x.x")}
 
         $values = Test-CanProcessToTargetVersion $IsRD2Target
 
@@ -138,13 +122,10 @@ Describe 'Test-CanProcessToTargetVersion tests'{
         
         Mock -Command Test-Path -MockWith {$True}
 
-        Mock -Command Get-HKLMKeysOfInterest -MockWith {Get-TestKeys($False)}
-
-        Mock -CommandName New-MaybeRegistryKeyModelsFromFile -MockWith {$null} 
+        Mock -CommandName New-RegistryKeyModelsFromFile -MockWith {$null} 
 
         $values = Test-CanProcessToTargetVersion $false
 
         $values.CanProcess | Should -Be $False
     }
-
 }

@@ -35,7 +35,7 @@ Describe 'Export-RD3RegistryValues'{
 
         Test-Path $testDataPath | Should -Be $true
 
-        $regDataObjects = New-MaybeRegistryKeyModelsFromFile $testDataPath
+        $regDataObjects = New-RegistryKeyModelsFromFile $testDataPath
         
         for ($idx = 0; $idx -lt $regDataObjects.Count; $idx++){
             $numeric = (($idx + 1).ToString())
