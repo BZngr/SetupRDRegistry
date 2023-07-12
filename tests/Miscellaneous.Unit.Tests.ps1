@@ -42,24 +42,27 @@ Describe 'Get-Rd3HKLMPaths Tests' {
     }
 }
 
-Describe 'Get-ActiveRDVersionTests'{
+Describe 'New-TogggleModel'{
     BeforeAll{
-        . $PSScriptRoot\..\src\SetRegistryForRDVersionImpl.ps1 Get-ActiveRDVersion
+        . $PSScriptRoot\..\src\SetRegistryForRDVersionImpl.ps1 New-ToggleModel
 
     }
     It 'Returns <expected>' -ForEach @(
-        @{RD2Keys = @("2.5.2.0", "3.0.0.0") ; Expected = "3.0.0.0"}
-        @{RD2Keys = @() ; Expected = "TBD"}
-        @{RD2Keys = @("2.5.2.0") ; Expected = "2.5.2.0"}
-        @{RD2Keys = @("3.0.0.0") ; Expected = "3.0.0.0"} #only Rd3 exists on the machine
-        @{RD2Keys = @("2.5.9.0", "3.0.0.0") ; Expected = "3.0.0.0"}
-        @{RD2Keys = @("2.5.9.0", "3.1.0.0") ; Expected = "3.1.0.0"}
-        @{RD2Keys = @("2.5.9.0") ; Expected = "2.5.9.0"}
-        @{RD2Keys = @("3.1.0.0") ; Expected = "3.1.0.0"} #only Rd3 exists on the machine
+        @{RD2Keys = @("2.5.2.0", "3.0.0.0") ; Expected = "3.0.0.0" ; ExpectedRD2 = "2.5.2.0" ; ExpectedRD3 = "3.0.0.0"}
+        @{RD2Keys = @() ; Expected = "TBD" ; ExpectedRD2 = "TBD" ; ExpectedRD3 = "TBD"}
+        @{RD2Keys = @("2.5.2.0") ; Expected = "2.5.2.0" ; ExpectedRD2 = "2.5.2.0" ; ExpectedRD3 = "TBD"}
+        @{RD2Keys = @("3.0.0.0") ; Expected = "3.0.0.0" ; ExpectedRD2 = "TBD" ; ExpectedRD3 = "3.0.0.0"} #only Rd3 exists on the machine
+        @{RD2Keys = @("2.5.9.0", "3.0.0.0") ; Expected = "3.0.0.0" ; ExpectedRD2 = "2.5.9.0" ; ExpectedRD3 = "3.0.0.0"}
+        @{RD2Keys = @("2.5.9.0", "3.1.0.0") ; Expected = "3.1.0.0" ; ExpectedRD2 = "2.5.9.0" ; ExpectedRD3 = "3.1.0.0"}
+        @{RD2Keys = @("2.5.9.0") ; Expected = "2.5.9.0" ; ExpectedRD2 = "2.5.9.0" ; ExpectedRD3 = "TBD"}
+        @{RD2Keys = @("3.1.0.0") ; Expected = "3.1.0.0" ; ExpectedRD2 = "TBD" ; ExpectedRD3 = "3.1.0.0"} #only Rd3 exists on the machine
     ) {
 
-        $result = Get-ActiveRDVersion $rd2Keys
+        $result = New-ToggleModel $rd2Keys
 
-        $result | Should -Be $expected
+        $result.Rd2Version | Should -Be $expectedRD2
+        $result.Rd3Version | Should -Be $expectedRD3
+        $result.ActiveVersion | Should -Be $expected
     }
 }
+

@@ -1,4 +1,4 @@
-Describe 'Convert-MaybeJsonToRegistryKeyModel tests'{
+Describe 'New-RegistryKeyModelsFromFile tests'{
     BeforeAll {        
         . $PSScriptRoot\..\src\SetRegistryForRDVersionImpl.ps1 New-RegistryKeyModelsFromFile
     }

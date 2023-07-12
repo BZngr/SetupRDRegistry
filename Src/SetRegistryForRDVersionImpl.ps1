@@ -1,19 +1,15 @@
+$script:toggleModel = @{}
+$script:rdHKCRKeys = @()
+$script:rd3KeysCacheErrorMsg = ""
+$script:numberOfRD3Keys = 2
+$script:rd3ModelsFromFile = @{}
+$script:rd3HKLMCachePath = ""
 
 $HKLMClsidPath = "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Classes\CLSID\"
 $HKCRClsidPath = "Registry::HKEY_CLASSES_ROOT\CLSID\"
 
 $extensionClsid = "69E0F697-43F0-3B33-B105-9B8188A6F040"
 $dockableToolWindowClsid = "69E0F699-43F0-3B33-B105-9B8188A6F040"
-
-$script:rd3Version = "TBD"
-$script:rd2Version = "TBD"
-$script:rdActiveVersion = "TBD"
-
-$script:rdHKCRKeys = @()
-
-#There are currently(4/23) 2 registry keys to be added for RD3: 
-#Rubberduck.Extension and Rubberduck.DockableToolWindow
-$numberOfRD3Keys = 2
 
 $rdExtension = @{
     HKLMPath = "${HKLMClsidPath}{${extensionClsid}}"
@@ -33,9 +29,33 @@ $rdDockableToolWindow = @{
 
 $rdRegistryKeyPropertyNames = @("Assembly", "Class", "CodeBase", "RuntimeVersion")
 
-$rd3HKLMDataPersistancePath = (Get-ChildItem env:USERPROFILE).Value + `
-    "\AppData\Roaming\Rubberduck\RD3HKLMValues.json"
+#null parameter allows injecting SubKeyNames for testing
+function Initialize-ScriptScopeFields($rdHKCRKeys = $null){
+    if ($null -ne $rdHKCRKeys){
+        $script:rdHKCRKeys = $rdHKCRKeys
+    } else {
+        $script:rdHKCRKeys = 
+            (Get-SubKeyNames "ClassesRoot" "CLSID\{${extensionClsid}}\InProcServer32")
+    }
+    $script:toggleModel = New-ToggleModel $script:rdHKCRKeys    
+    $script:rd3KeysCacheErrorMsg = "Prior RD3 values unavailable." + `
+        "Please clean/build the Rubberduck3 solution to setup the registry"
 
+    $script:rd3HKLMCachePath = (Get-ChildItem env:USERPROFILE).Value + `
+        "\AppData\Roaming\Rubberduck\RD3HKLMValues.json"
+
+    #There are currently(4/23) 2 registry keys to be added for RD3: 
+    #Rubberduck.Extension and Rubberduck.DockableToolWindow
+    $script:numberOfRD3Keys = 2
+
+    if (-not (Test-IsConfiguredForRD3) -and (Test-Path (Get-CachedRD3KeyValuesFilepath))){
+
+        $script:rd3ModelsFromFile = New-RegistryKeyModelsFromFile
+        if (($null -ne $script:rd3ModelsFromFile) -and ($script:rd3ModelsFromFile.Count -eq $script:numberOfRD3Keys)){
+            $script:toggleModel.Rd3Version = Get-Rd3VersionFromCacheModel $script:rd3ModelsFromFile
+        }    
+    }
+}
 
 function Test-CanProcessToTargetVersion($targetIsRD2){
 
@@ -43,22 +63,26 @@ function Test-CanProcessToTargetVersion($targetIsRD2){
 
     $result = @{CanProcess = $False}
 
+    $activeVersion = Convert-VersionToXVersion (Get-ActiveVersion)
+
     if ((Test-IsConfiguredForRD2) -and $targetIsRD2){
-        $result.Message = "Registry is configured for Rubberduck Version ${script:rdActiveVersion} - Nothing to do"
+        $result.Message = ("Registry is configured for Rubberduck Version ${activeVersion} - Nothing to do")
         $result
         return
     }
     
     if ((Test-IsConfiguredForRD3) -and (-not $targetIsRD2)){
-        $result.Message = "Registry is configured for Rubberduck Version ${script:rdActiveVersion} - Nothing to do"
+        $result.Message = ("Registry is configured for Rubberduck Version ${activeVersion} - Nothing to do")
         $result
         return
     }
     
     if (-not $targetIsRD2){
 
-        $valuesFromFileFailureMsg = "Prior RD3 values unavailable. Please build the Rubberduck3 solution to setup the registry"
-        if (-not (Test-Path (Get-CachedRD3KeyValuesFilepath))){
+        $valuesFromFileFailureMsg = $script:rd3KeysCacheErrorMsg
+
+        $cachedDataPath = Get-CachedRD3KeyValuesFilepath
+        if (-not (Test-Path $cachedDataPath) -or (Test-FileIsLocked $cachedDataPath)){
             $result.Message = $valuesFromFileFailureMsg
             $result
             return
@@ -96,7 +120,10 @@ function Test-CanProcessToTargetVersion($targetIsRD2){
 }
 
 function Restore-RubberduckV2($rdHKLMClsidKeys){
-    Write-Verbose "Restoring registry values to support Rubberduck Version 2"
+
+    $rd2Version = Convert-VersionToXVersion $script:toggleModel.Rd2Version
+
+    Write-RestoreStartMessage $rd2Version
 
     $registryKeyModels = Get-RegistryKeyModels $rdHKLMClsidKeys
 
@@ -108,23 +135,41 @@ function Restore-RubberduckV2($rdHKLMClsidKeys){
 
     Set-RD2InProcServer32Values
 
-    "Registry keys set to support Rubberduck Version ${script:rd2Version}"
+    Write-RestoreCompleteMessage $rd2Version
 }
 
 function Restore-RubberduckV3($regKeyModels){
 
-    Write-Verbose "Restoring registry values to support Rubberduck Version ${script:rd3Version}"
+    $rd3Version = Convert-VersionToXVersion $script:toggleModel.Rd3Version
 
-    Set-Rd3Version $regKeyModels
+    Write-RestoreStartMessage $rd3Version
     
     Add-RD3RegistryKeys $regKeyModels
 
     Set-RD3InProcServer32Values $regKeyModels
 
-    "Registry keys set to support Rubberduck Version ${script:rd3Version}"
+    Write-RestoreCompleteMessage $rd3Version
 }
 
-function Set-Rd3Version($regKeyModels){
+function Write-RestoreStartMessage($rdVersion){
+    
+    if ($WhatIfPreference){
+        "What if: Restoring registry values to support Rubberduck Version " + $rdVersion
+    } else{
+        Write-Verbose ("Registry keys set to support Rubberduck Version " + $rdVersion)
+    }
+}
+
+function Write-RestoreCompleteMessage($rdVersion){
+    
+    if ($WhatIfPreference){
+        "What if: Registry keys set to support Rubberduck Version " + $rdVersion
+    } else{
+        Write-Verbose ("Registry keys set to support Rubberduck Version " + $rdVersion)
+    }
+}
+
+function Get-Rd3VersionFromCacheModel($regKeyModels){
     if ($regKeyModels.Count -lt 1){
         return
     }
@@ -132,7 +177,7 @@ function Set-Rd3Version($regKeyModels){
     $assemblyValue = $regKeyModels[0].Properties.Assembly
     $idxOf3 = $assemblyValue.IndexOf("3")
 
-    $script:rd3Version = $assemblyValue.Substring(`
+    $assemblyValue.Substring(`
         $idxOf3, $assemblyValue.IndexOf(",", $idxOf3) - $idxOf3)
 }
 
@@ -154,41 +199,42 @@ function Add-RD3RegistryKeys($regKeyModels){
     }
 }   
 
-function Get-ActiveRDVersion($rdHKCRKeys){
+function New-ToggleModel($rdHKCRKeys){
     
-    $result = "TBD"
+    $toggleModel = @{
+        Rd2Version = "TBD";
+        Rd3Version = "TBD";
+        ActiveVersion = "TBD"
+    }
     
-    if ($rdHKCRKeys.Count -eq 2){ 
-        if ($rdHKCRKeys[0] -like "2.*"){
-            $script:rd2Version = $rdHKCRKeys[0]
-            $script:rd3Version = $rdHKCRKeys[1]
-        } else {
-            $script:rd3Version = $rdHKCRKeys[0]
-            $script:rd2Version = $rdHKCRKeys[1]
-        }
-        $result = $script:rd3Version
+    $rdHKCRKeys | ForEach-Object { 
+        if ($_ -like "2.*"){
+            $toggleModel.Rd2Version = $_
+        } elseif ($_ -like "3.*"){
+            $toggleModel.Rd3Version = $_
+        } 
     }
-    #Handles scenario where only Rd2 OR Rd3 is registered on the machine
-    elseif (-not $rdHKCRKeys.Count -eq 0){
-        if ($rdHKCRKeys -like "2.*"){
-            $script:rd2Version = $rdHKCRKeys
-            $result = $script:rd2Version
-        } elseif ($rdHKCRKeys -like "3.*"){
-            $script:rd3Version = $rdHKCRKeys
-            $result = $script:rd3Version
-        }
+    
+    # If both 2.5.2.x AND 3.0.0.0 are appear in HKCR, then RD3 is active
+    # If only one RD key is found, then the version number of the found key is active.  
+    #The missing key will have the value of 'TBD'
+    if($rdHKCRKeys.Count -eq 2){
+        $toggleModel.ActiveVersion = $toggleModel.Rd3Version
+    } elseif ($toggleModel.Rd2Version -ne "TBD"){
+        $toggleModel.ActiveVersion = $toggleModel.Rd2Version
+    } elseif ($toggleModel.Rd3Version -ne "TBD"){
+        $toggleModel.ActiveVersion = $toggleModel.Rd3Version
     }
-    $result
+
+    $toggleModel
 }
 
 function Get-CachedRD3KeyValuesFilepath($filepath = $null){
 
-    $result = $rd3HKLMDataPersistancePath
     if (-not $null -eq $filepath){
-        $result = $filePath
+        $script:rd3HKLMCachePath = $filePath
     }
-
-    $result
+    $script:rd3HKLMCachePath
 }
 
 function Get-HKLMKeysOfInterest($keyNames){
@@ -266,20 +312,22 @@ function Set-RD3InProcServer32Values(){
 }
 
 function Get-RD2PrototypeKeys(){
+
+    $rd2Version = Get-Rd2Version
     @(
-        $rdExtension.InProcServer32Path + "\${script:rd2Version}"
-        $rdDockableToolWindow.InProcServer32Path + "\${script:rd2Version}"
+        $rdExtension.InProcServer32Path + "\${rd2Version}"
+        $rdDockableToolWindow.InProcServer32Path + "\${rd2Version}"
     )
 }
 
-
 function Get-RegistryKeyModels($rdHKLMKeys){
     
+    $rd3Version = Get-Rd3Version
     $registryKeyModels = @()
     foreach ($k in $rdHKLMKeys){
         $registryKeyModels += `
             (New-RegistryKeyModelFromRegistryKey `
-                ($k + "\InProcServer32\" + $script:rd3Version))
+                ($k + "\InProcServer32\${rd3Version}"))
     }
 
     $registryKeyModels
@@ -301,7 +349,7 @@ function Export-RD3RegistryValues($registryKeyModels, $exportPath = $null){
 
 function Get-Rd3HKLMPaths($targetKey, $scriptVersion = $null){
     
-    $versionToken = $script:rd3Version
+    $versionToken = Get-Rd3Version
     if ($null -ne $scriptVersion){
         $versionToken = $scriptVersion
     }
@@ -444,18 +492,89 @@ function Test-AllPropertiesNotNull($model){
         Where-Object {$null -eq $model.Properties[$_]}).Count -eq 0       
 }
 
-function Test-IsConfiguredForRD2(){
-    if ($script:rdActiveVersion -eq "TBD"){
-        $script:rdActiveVersion = Get-ActiveRDVersion $script:rdHKCRKeys
+function Get-Rd2Version(){
+    $script:toggleModel.Rd2Version
+}
+
+function Get-Rd3Version(){
+    $script:toggleModel.Rd3Version
+}
+
+function Get-ActiveVersion(){
+    $script:toggleModel.ActiveVersion
+}
+
+function Get-InActiveVersion(){
+    $InactiveVersion = Get-Rd2Version
+    if (Test-IsConfiguredForRD2){
+        $InactiveVersion = Get-Rd3Version
     }
-    $script:rdActiveVersion.StartsWith("2.")
+    $InactiveVersion
+}
+
+function New-ViewModel(){
+    param(
+        [Parameter(Mandatory = $True)]
+        [string]$activeVersion,
+        [Parameter(Mandatory = $true)]
+        [string]$inactiveVersion,
+        [Parameter(Mandatory = $True)]
+        [string]$rd2Version,
+        [Parameter(Mandatory = $true)]
+        [string]$rd3Version
+    )
+    
+    $vm = @{
+        NV = $inactiveVersion
+        CV = $activeVersion
+        ErrorVersion = ""
+        DisplayError = $false
+        Preview = $true
+        ErrMsg =  @{Primary = "";  Fix = ""}
+    }
+
+    if ($rd2Version -eq "TBD"){
+        $vm.ErrorVersion="2"
+    }
+
+    if ($rd3Version -eq "TBD"){
+        $vm.ErrorVersion="3"
+    }
+
+    if (($vm.CV) -eq "TBD"){
+        $vm.ErrorVersion="NO RD VERSION REGISTERED"
+    }
+
+    $vm.HasDisplayError = $vm.ErrorVersion.Length -ne 0
+
+    $vm.ErrMsg = Get-ViewErrorMessaging $vm
+
+    $vm
+}
+
+function Get-ViewErrorMessaging($vm){
+    
+    $errMsg = @{Primary = "";  Fix = ""}
+
+    if ($vm.ErrorVersion.StartsWith("2")){
+        $errMsg.Primary = "Rubberduck v2 Registry Entries not found";
+        $errMsg.Fix = "Please Build or Install Rubberduck v2"
+    } elseif ($vm.ErrorVersion.StartsWith("3")){
+        $errMsg.Primary = "Unable to locate v3 setup data"
+        $errMsg.Fix = "To switch to v3, please Clean\Build or Install Rubberduck v3"
+    } elseif ($vm.ErrorVersion.StartsWith("NO RD VERSION")){
+        $errMsg.Primary = "Rubberduck version(s) data not found"
+        $errMsg.Fix = "Please Install or Build the Rubberduck version of interest"
+    }
+    $errMsg
+}
+
+function Test-IsConfiguredForRD2(){    
+    (Get-ActiveVersion).StartsWith("2.")
 }
 
 function Test-IsConfiguredForRD3(){
-    if ($script:rdActiveVersion -eq "TBD"){
-        $script:rdActiveVersion = Get-ActiveRDVersion $script:rdHKCRKeys
-    }
-    $script:rdActiveVersion.StartsWith("3.")
+    (Get-ActiveVersion).StartsWith("3.")
 }
 
 function Test-FileIsLocked($file){
@@ -469,7 +588,7 @@ function Test-FileIsLocked($file){
     }    
 }
 
-function Get-SubKeys($hiveName, $subKeyPath){
+function Get-SubKeyNames($hiveName, $subKeyPath){
     $hiveKeys = @()
     try 
     {
@@ -547,4 +666,37 @@ function Set-RegistryKeyProperties(){
 
 function Get-RegistryPropertyValue($registryKey, $propertyName){
     (Get-ItemPropertyValue -Path $registryKey -Name $propertyName)
+}
+
+function New-WindowFromXamlBlob($xamlBlob){
+    [xml] $viewAsXML = $xamlBlob
+    
+    try {
+        $nodeReader= (New-Object System.Xml.XmlNodeReader $viewAsXML)
+        $uiWIndow = [Windows.Markup.XamlReader]::load($nodeReader)
+    }
+    catch {
+        Write-Output $_
+        break;
+    }
+    $uiWIndow
+}
+
+function Set-UIButtonVersionLabels($uiWindow, $viewModel){
+    $currentV = Convert-VersionToXVersion $viewModel.CV
+    $nextV = Convert-VersionToXVersion $viewModel.NV
+
+    $switchToVersionLabel = $uiWindow.findName("SwitchToVButtonLabel")
+    $switchToVersionLabel.Text = $nextV
+
+    $keepCurrentV = $uiWindow.FindName("CurrentVButtonLabel")
+    $keepCurrentV.Text = $currentV
+
+    $previewVersion = $uiWindow.FindName("PreviewVButtonLabel")
+    $previewVersion.Text = $nextV
+}
+
+function Convert-VersionToXVersion($versionNumber){
+    $idxLastDot = $versionNumber.LastIndexOf(".")
+    "v" +  $versionNumber.Substring(0, $idxLastDot) + ".x"
 }
