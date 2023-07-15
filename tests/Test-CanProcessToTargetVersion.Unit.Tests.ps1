@@ -1,6 +1,6 @@
 Describe 'Test-CanProcessToTargetVersion tests'{
     BeforeAll {        
-        . $PSScriptRoot\..\src\SetRegistryForRDVersionImpl.ps1
+        . $PSScriptRoot\..\src\Switch-RDVersionCode.ps1
         Initialize-ScriptScopeFields @('2.5.2.1', '3.0.0.0')    
     }
     Context 'Config File is Missing'{

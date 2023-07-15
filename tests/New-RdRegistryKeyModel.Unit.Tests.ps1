@@ -1,7 +1,7 @@
 Describe 'New-RdRegistryKeyModel tests'{
     It 'Generates correct number of RD3  registry records'{
         
-        . $PSScriptRoot\..\src\SetRegistryForRDVersionImpl.ps1
+        . $PSScriptRoot\..\src\Switch-RDVersionCode.ps1
         
         $theKeys = @("BOGUS\Path1", "BOGUS\Path2")
 

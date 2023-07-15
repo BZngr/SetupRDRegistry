@@ -1,7 +1,7 @@
 Describe 'Remove-RD3RegistryKeys Calls Remove-Item'{
     It 'Removes 2 HKLM Keys'{
         
-        . $PSScriptRoot\..\src\SetRegistryForRDVersionImpl.ps1 Remove-RD3RegistryKeys
+        . $PSScriptRoot\..\src\Switch-RDVersionCode.ps1 Remove-RD3RegistryKeys
 
         Mock -CommandName Remove-Item -MockWith {
             Write-Verbose -Message "Called Mock -> Remove-Item" -Verbose

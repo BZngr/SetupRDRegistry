@@ -1,8 +1,8 @@
 Describe 'Export-RD3RegistryValues'{
     It 'Export/Imports RegistryKeyModels'{
         
-        . $PSScriptRoot\..\src\SetRegistryForRDVersionImpl.ps1 Export-RD3RegistryValues
-        . $PSScriptRoot\..\src\SetRegistryForRDVersionImpl.ps1 New-RegistryKeyModelsFromFile
+        . $PSScriptRoot\..\src\Switch-RDVersionCode.ps1 Export-RD3RegistryValues
+        . $PSScriptRoot\..\src\Switch-RDVersionCode.ps1 New-RegistryKeyModelsFromFile
                         
         $testDataPath = $PSScriptRoot + "\TempPersistedTestValues.txt"
         if (Test-Path $testDataPath){

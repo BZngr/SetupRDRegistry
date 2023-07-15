@@ -1,7 +1,7 @@
 Describe 'Get-RegistryProperties'{
     It 'Generates Properties Hashtable'{
         
-        . $PSScriptRoot\..\src\SetRegistryForRDVersionImpl.ps1 New-RegistryKeyModelFromRegistryKey
+        . $PSScriptRoot\..\src\Switch-RDVersionCode.ps1 New-RegistryKeyModelFromRegistryKey
         
         $theKey = "BOGUS\Path"
 

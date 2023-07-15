@@ -1,6 +1,6 @@
 Describe 'Get-InProcServer32PathFromKey'{
     BeforeAll{
-        . $PSScriptRoot\..\src\SetRegistryForRDVersionImpl.ps1 Get-InProcServer32PathFromKey
+        . $PSScriptRoot\..\src\Switch-RDVersionCode.ps1 Get-InProcServer32PathFromKey
     }
     
     It 'Works with actual registry key'{
@@ -24,7 +24,7 @@ Describe 'Get-InProcServer32PathFromKey'{
 
 Describe 'Get-Rd3HKLMPaths Tests' {
     BeforeAll{
-        . $PSScriptRoot\..\src\SetRegistryForRDVersionImpl.ps1 Get-Rd3HKLMPaths
+        . $PSScriptRoot\..\src\Switch-RDVersionCode.ps1 Get-Rd3HKLMPaths
     }
     It 'Returns 3 paths' -ForEach @(
         @{Base = "RegPath::\CLSID\{XXX}"}
@@ -44,7 +44,7 @@ Describe 'Get-Rd3HKLMPaths Tests' {
 
 Describe 'New-TogggleModel'{
     BeforeAll{
-        . $PSScriptRoot\..\src\SetRegistryForRDVersionImpl.ps1 New-ToggleModel
+        . $PSScriptRoot\..\src\Switch-RDVersionCode.ps1 New-ToggleModel
 
     }
     It 'Returns <expected>' -ForEach @(

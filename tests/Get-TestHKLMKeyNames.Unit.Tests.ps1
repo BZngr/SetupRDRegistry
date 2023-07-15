@@ -1,6 +1,6 @@
 Describe "Get-TestHKLMKeyNames Tests"{
     BeforeAll{
-        . $PSScriptRoot\..\src\SetRegistryForRDVersionImpl.ps1 Get-HKLMKeysOfInterest
+        . $PSScriptRoot\..\src\Switch-RDVersionCode.ps1 Get-HKLMKeysOfInterest
 
         function Get-RDCLSIDs(){
             @(

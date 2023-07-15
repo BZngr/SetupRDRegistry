@@ -1,6 +1,6 @@
 Describe 'Unresolved Version(s)'{
     BeforeAll{
-        . $PSScriptRoot\..\src\SetRegistryForRDVersionImpl.ps1 New-ViewModel
+        . $PSScriptRoot\..\src\Switch-RDVersionCode.ps1 New-ViewModel
     }   
     
     It 'Generates correct ErrorSource' -ForEach @(

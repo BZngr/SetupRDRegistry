@@ -1,6 +1,6 @@
 Describe 'New-RegistryKeyModelsFromFile tests'{
     BeforeAll {        
-        . $PSScriptRoot\..\src\SetRegistryForRDVersionImpl.ps1 New-RegistryKeyModelsFromFile
+        . $PSScriptRoot\..\src\Switch-RDVersionCode.ps1 New-RegistryKeyModelsFromFile
     }
     It 'Returns $null when file contains invalid content'{
         

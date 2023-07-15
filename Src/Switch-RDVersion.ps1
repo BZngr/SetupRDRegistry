@@ -7,7 +7,7 @@ param (
     [string]$requestedOp
 )
 
-. $PSScriptRoot\SetRegistryForRDVersionImpl.ps1
+. $PSScriptRoot\Switch-RDVersionCode.ps1
 
 function ShowUI(){
     param (
