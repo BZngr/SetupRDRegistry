@@ -697,6 +697,18 @@ function Set-UIButtonVersionLabels($uiWindow, $viewModel){
 }
 
 function Convert-VersionToXVersion($versionNumber){
-    $idxLastDot = $versionNumber.LastIndexOf(".")
-    "v" +  $versionNumber.Substring(0, $idxLastDot) + ".x"
+
+    $result = "TBD"
+    
+    try {
+        $idxLastDot = $versionNumber.LastIndexOf(".")
+        $V = "v" +  $versionNumber.Substring(0, $idxLastDot) + ".x"
+        if ($V.StartsWith("vv")){
+            $V = $V.Substring(1)
+        }
+        $result = $V
+    }
+    catch {}
+
+    $result
 }

@@ -66,3 +66,21 @@ Describe 'New-TogggleModel'{
     }
 }
 
+Describe 'Convert-VersionToXVersion Tests'{
+    BeforeAll{
+        . $PSScriptRoot\..\src\Switch-RDVersionCode.ps1 Convert-VersionToXVersion
+
+    }
+    It 'Returns <expected>' -ForEach @(
+        @{Val = "2.5.2.0" ; Expected = "v2.5.2.x"}
+        @{Val = "v2.5.2.x" ; Expected = "v2.5.2.x"}
+        @{Val = "TBD" ; Expected = "TBD"}
+        @{Val = "v2" ; Expected = "TBD"}
+    ) {
+
+        $result = Convert-VersionToXVersion $val
+
+        $result | Should -Be $expected
+    }
+}
+

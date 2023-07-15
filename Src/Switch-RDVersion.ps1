@@ -175,22 +175,37 @@ if ($targetFromRequestedOpIsRD2){
 
 <#
 .SYNOPSIS
-Modifies the registry to enable either the Rubberduck 3 or the Rubberduck 2 VBIDE Add-In.
+Modifies the registry to switch between the Rubberduck 3 and Rubberduck 2 VBIDE Add-Ins.
 .DESCRIPTION
-Modifies the registry to enable either the Rubberduck 3 or the Rubberduck 2 VBIDE Add-In.
+Modifies the registry to switch between the Rubberduck 3 and Rubberduck 2 VBIDE Add-Ins.
 
 Why: 
 RD3 re-uses RD2 CLSIDs.  Consequently, the two Add-Ins cannot co-exist in memory.  
 When the RD3 solution is built, the build process introduces new keys to the LocalMachine (HKLM) hive.  
-Re-building RD2 does not configure the registry to load RD2 once the HKLM keys have been introduced.
+Re-building RD2 does not configure the registry to enable RD2 once the RD3  HKLM keys have been introduced.
 
 *** The script must be invoked from a PowerShell session with Administrator privileges ***
 
-To run the script to see what it does WITHOUT making changes, enter the following:
-(The commands below assume a Powershell session is opened in the folder containing the SetRegistryForRDVersion.ps1 script)
+(The commands below assume a Powershell session has been opened in the folder containing the Switch-RDVersion.ps1 script)
 
-Setup for RD2:    PS> .\SetRegistryForRDVersion.ps1 2 -Verbose -WhatIf
-Setup for RD3:    PS> .\SetRegistryForRDVersion.ps1 3 -Verbose -WhatIf
+USING THE GUI:
+The easiest way to use the script is to invoke the script without any parameters as follows:
+PS> .\Switch-RDVersion.ps1
+
+The above invocation results in a pop-up dialog with 3 buttons (plus an Exit button):
+Top button - indicates the currently configured RD Add-In.  Clicking this button does nothing except dismissing the window.
+Middle button - indicates the available alternate Add-In.  Clicking this button modifies the registry.
+Bottom button - Provides a preview/test of script actions when the Middle button is clicked.  The registry is not modified.
+
+The Bottom button is equivalent to using the -WhatIf parameter in the CLI examples below.
+Tooltip information is available for each button
+
+USING COMMAND LINE INTERFACE PARAMETERS:
+
+To run the script to see what it does WITHOUT making changes, enter the following:
+
+Setup for RD2:    PS> .\Switch-RDVersion.ps1 2 -Verbose -WhatIf
+Setup for RD3:    PS> .\Switch-RDVersion.ps1 3 -Verbose -WhatIf
 
 ****************************************************************************************
 Note: Absence of the -WhatIf switch parameter from the above expressions will enable the 
@@ -198,9 +213,9 @@ script to make changes to the registry.
 *****************************************************************************************
 
 To see the currently active version: 
-PS> .\SetRegistryForRDVersion.ps1 CurrentVersion
+PS> .\Switch-RDVersion.ps1 CurrentVersion
 
-Alternatively, re-building the RD3 solution will also modify the Registry, enabling the RD3 Add-In  
+Alternatively, cleaning and re-building the RD3 solution will also modify the Registry, enabling the RD3 Add-In  
 
 There is more content available using the -examples, -detailed, or -full switches as indicated in REMARKS
 .NOTES
@@ -243,31 +258,35 @@ in #1 above, resulted in the creation of:
     HKEY_CLASSES_ROOT\CLSID\{69E0F699-43F0-3B33-B105-9B8188A6F040}\InProcServer32\3.X.Y.Z
 
 .EXAMPLE
-...\SetRegistryForRDVersion.ps1 CurrentVersion
+...\Switch-RDVersion.ps1
+Provides a dialog window to support switching RD Add-In versions
+
+.EXAMPLE
+...\Switch-RDVersion.ps1 CurrentVersion
 Script output identifies the Rubberduck version currently setup in the registry
 
 .EXAMPLE
-...\SetRegistryForRDVersion.ps1 2 -WhatIf
+...\Switch-RDVersion.ps1 2 -WhatIf
 See operations that 'would have' taken place to setup for RD2
 
 .EXAMPLE
-...\SetRegistryForRDVersion.ps1 2 -Verbose -WhatIf
+...\Switch-RDVersion.ps1 2 -Verbose -WhatIf
 See operations that 'would have' taken place to setup for RD2 with the most descriptive content
 
 .EXAMPLE
-...\SetRegistryForRDVersion.ps1 rd2 -Verbose
+...\Switch-RDVersion.ps1 rd2 -Verbose
 Allow the script to make changes to the registry to setup RD2, providing a narrative of the process
 
 .EXAMPLE
-.\SetRegistryForRDVersion.ps1 3 -Verbose -WhatIf
+.\Switch-RDVersion.ps1 3 -Verbose -WhatIf
 See operations that 'would have' taken place to setup for RD3 with the most descriptive content
 
 .EXAMPLE
-...\SetRegistryForRDVersion.ps1 rd3 -Verbose -WhatIf
+...\Switch-RDVersion.ps1 rd3 -Verbose -WhatIf
 See operations that 'would have' taken place to setup for RD3 with the most descriptive content
 
 .EXAMPLE
-...\SetRegistryForRDVersion.ps1 rd3
+...\Switch-RDVersion.ps1 rd3
 Allow the script to make changes to the registry to setup RD3 with limited descriptive content
 #>
 
